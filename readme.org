@@ -54,9 +54,9 @@
 - Primero hay que crear un archivo de texto con extensión kbd, ahí se
   pondrá la configuración
 - Localizar archivo de dispositivo
-  + Revisar directorios /dev/input/by-path (teclados internos) y /dev/input/by-id
+  + Revisar directorios /dev/input/by-path (teclados internos) y /dev/input/by-id (teclado externo)
   + Identificar algún archivo relacionado al teclado (puede aparecer la cadena kbd)
-  + Se puede complementar con con el comando lsusb
+  + Se puede complementar con el comando lsusb
 - En el archivo de configuración los comentarios empiezan con ;;
 - Notar uso de paréntesis en toda la configuración
 - Se pueden agregar tantos espacios como hagan falta
