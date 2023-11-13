@@ -1,0 +1,325 @@
+#+title: Hackea tu teclado con KMonad
+
+* Teclados
+- Forma principal de interactuar con una computadora de escritorio
+- En años recientes se han popularizado los teclados mecánicos 
+- Muchos de estos teclados son programables
+- Existe una gran comunidad de entusiastas de los teclados que crean software y hardware para teclados
+- Gran diversidad de diseños de teclado y sus componentes
+
+[[file:./mec1.jpeg]]  [[file:./mec2.jpeg]]   [[file:./mec3.jpeg]]  
+
+
+* Software de teclados
+- Existen varios proyectos FLOSS, entre los que destacan QMK y ZMK
+- Este software usualmente viene instalado como firmware en un microcontrolador integrado al teclado
+- Permiten capacidades como manejo de capas, remaping, macros, tap-hold, multi tap, entre otros
+- Algunos teclados con pocas teclas requieren de estos firmwares para compensar la falta de teclas
+* KMonad
+- https://github.com/kmonad/kmonad
+- Licencia MIT (open source)
+- Mulit plataforma (Linux, windows, Mac)
+- Permite tener las funcionalidades de un teclado programable en cualquier teclado
+- Utiliza una configuración tipo Lisp muy flexible
+- Desarrollado principalmente en Haskell
+- En Linux utiliza uinput para interceptar eventos de entrada y
+  generar un dispositivo virtual
+* Instalación
+- Guia: https://github.com/kmonad/kmonad/blob/master/doc/installation.md 
+** Dependencias
+- uinput
+  #+begin_src bash :session *bash* :results output :exports both :tangle /tmp/test.sh
+    # ver si está el módulo cargado
+    lsmod | grep uinput
+    # sino cargarlo
+    sudo modprobe uinput
+  #+end_src
+** Formas de instalar
+*** Binario
+- Descargar último release
+- https://github.com/kmonad/kmonad/releases
+- Dar permisos de ejecución:
+  #+begin_src bash :session *bash* :results output :exports both :tangle /tmp/test.sh
+    chmod +x rutaDescarga/kmonad
+  #+end_src
+*** Gestor de paquetes
+- Hay paquetes para distros basadas en Arch, Guix, Void y NixOS
+  #+begin_src bash :session *bash* :results output :exports both :tangle /tmp/test.sh
+    # en arch-likes
+    yay -S kmonad-bin
+  #+end_src
+* Configuración inicial
+- Tutorial oficial: https://github.com/kmonad/kmonad/blob/master/keymap/tutorial.kbd
+- Referencia rápida: https://github.com/kmonad/kmonad/blob/master/doc/quick-reference.md#tap-buttons
+- Primero hay que crear un archivo de texto con extensión kbd, ahí se
+  pondrá la configuración
+- Localizar archivo de dispositivo
+  + Revisar directorios /dev/input/by-path (teclados internos) y /dev/input/by-id
+  + Identificar algún archivo relacionado al teclado (puede aparecer la cadena kbd)
+  + Se puede complementar con con el comando lsusb
+- En el archivo de configuración los comentarios empiezan con ;;
+- Notar uso de paréntesis en toda la configuración
+- Se pueden agregar tantos espacios como hagan falta
+#+begin_src emacs-lisp :session *elisp* :results output :exports both :tangle /tmp/test.sh
+  (defcfg
+ ;; For Linux 
+ input  (device-file "/dev/input/by-id/dispositivo")
+ output (uinput-sink "My KMonad output"
+		      "sleep 1 && comandos que quieras que se ejecuten al correr kmonad")
+ ;;cmp-seq ralt    ;; Set the compose key to `RightAlt'
+ cmp-seq-delay 5 ;; 5ms delay between each compose-key sequence press
+
+ fallthrough true ;; para que las teclas que no estén en defsrc se manejen por default
+ allow-cmd true ;; habilitar cmd-button tener cuidado, puede haber comandos peligrosos
+ )
+#+end_src 
+* Bloque =defsrc=
+- Se define un mapa de teclas de acuerdo a como funciona el teclado sin kmonad
+- El mapa se define como una lista de keycodes (o alias de keycodes de kmonad)
+- Referencia keycodes: https://github.com/kmonad/kmonad/blob/master/src/KMonad/Keyboard/Keycode.hs 
+- Comando útil para ver keycodes: evtest (instalar con gestor de paquetes)
+- No es necesario cubrir todas las teclas, sólo las que interesa cambiar
+- Se recomienda tomar el mapa que da el tutorial, funciona bien para teclados en español
+#+begin_src emacs-lisp :session *emacs* :results output :exports both :tangle /tmp/test.sh
+  (defsrc
+    grv  1    2    3    4    5    6    7    8    9    0    -    =    bspc
+    tab  q    w    e    r    t    y    u    i    o    p    [    ]    \
+    caps a    s    d    f    g    h    j    k    l    ;    '    ret
+    lsft z    x    c    v    b    n    m    ,    .    /    rsft
+    lctl lmet lalt           spc            ralt rmet cmp  rctl
+  )
+#+end_src
+  
+* Bloque =defalias=
+- Para crear alias de botones que aparecerán en las capas
+- Cualquier cosa que se defina con un alias es un botón válido
+- Se recomienda usar alias de máximo 3 caracteres para mantener la
+  alineación del bloque defsrc
+- Para referenciar un alias en otra parte de la configuración se
+  antepone @
+
+  #+begin_src emacs-lisp :session *elisp* :results output :exports both :tangle /tmp/test.sh
+    (defalias
+
+
+    ;; dvorak 
+    acm (tap-hold-next-release 1000 ret (layer-toggle acentos))
+    lcm (tap-hold-next-release 1000 spc (layer-toggle numeros))
+    cor (tap-hold-next-release 1000 r lctl)
+    col (tap-hold-next-release 1000 . lctl)
+    blo (tap-hold-next-release 1000 KeyCompose caps)
+    ;;bl2 (tap-hold-next-release 1000 KeyEnd caps)
+    mac (tap-hold-next-release 1000 bspc (layer-toggle macro))
+    as  (tap-hold-next-release 1000 a lsft)
+    ss  (tap-hold-next-release 1000 s lsft)
+    nk  (tap-hold-next-release 1000 k (layer-toggle numeros))
+    cz  (tap-hold-next-release
+         1000
+         (around-next-timeout
+          100
+          (layer-toggle acentos2)
+          KeyEnd)
+         caps)
+
+    ;; macros
+    ma2 (layer-toggle macro2)
+    par (tap-hold-next-release
+         1000
+         (tap-macro-release S-8 S-9 lft lsft) (layer-toggle macro2))
+    pa2 (tap-macro S-8 C-A-rght S-9 C-A-lft rght)
+    cur (tap-macro (around ralt [) (around ralt ]) lft)
+    lla (tap-macro (around ralt ') (around ralt KeyBackslash) lft)
+    bra (tap-macro Key102nd S-Key102nd lft)
+    arr (around ralt 2)
+    br  (around ralt 1)
+    has (around ralt 3)
+    sw  (around lalt KeyTab)
+    c1  (around ralt [)
+    c2  (around ralt ])
+    q1  (tap-macro - - lft)
+    q2  (tap-macro S-2 S-2 lft)
+    ll1 (around ralt ')
+    ll2 (around ralt KeyBackslash)
+    car (tap-macro S-[ S-[)
+    til (tap-macro (around ralt ;) (around ralt ;))
+    cma S-Key102nd
+    cme Key102nd
+
+    ;; macros2
+    bs  (around ralt -)
+    l22 (tap-macro @lla ret ret KeyUp KeyTab)
+
+    ;; acentos
+    ac2 (layer-toggle acentos2)
+    a   (tap-macro ' a)
+    e   (tap-macro ' e)
+    i   (tap-macro ' i)
+    o   (tap-macro ' o)
+    u   (tap-macro ' u)
+    cp  (around lalt w)
+    mx  (around lalt x)
+    av  (around lalt v)
+    al  (around lalt spc)
+    ku  KeyUp
+    kd  KeyDown
+
+
+
+    ;; acentos2
+    aa  (tap-macro ' S-a)
+    ee  (tap-macro ' S-e)
+    ii  (tap-macro ' S-i)
+    oo  (tap-macro ' S-o)
+    uu  (tap-macro ' S-u)
+    c2z C-S--
+
+    ;; numeros
+    n2 (layer-toggle numeros2)
+    m1 (tap-macro-release (cmd-button "xdotool mousedown 1")
+                          (cmd-button "xdotool mouseup 1"))
+    m2 (tap-macro-release (cmd-button "xdotool mousedown 3")
+                          (cmd-button "xdotool mouseup 3"))
+
+
+    )
+  #+end_src
+* Bloques =deflayer=
+- Para definir capas
+- Se pueden agregar tantas capasa como se desee
+- La primera capa que se define se considera la capa base, es la que
+  KMonad carga por defecto
+- Las capas son esencialmente un mapeo con el bloque =defsrc=, por lo
+  que debe haber una correspondencia uno a uno
+- Las capas se estructuran como una pila, osea que se enciman entre si
+- Puede darse el caso de varias capas encimadas a la vez
+- El botón especial _ (guión bajo) establece que la capa de abajo de
+  la pila maneje la techa
+- El botón especial XX establece que el botón no hace nada y no se
+  propaga a las capas de abajo de la pila
+
+#+begin_src emacs-lisp :session *elisp* :results output :exports both :tangle /tmp/test.sh
+(deflayer
+ dvorak
+ grv  1    2    3    4    5    6    7    8    9    0    /    =   bspc
+ tab  -    ,    @col p    y    w    g    c    h    @nk  [    ]    \
+ @blo @as  o    e    u    i    d    @cor t    n    @ss  @cz  ret
+ lsft ;    q    j    l    @xw  b    m    f    v    z    rsft
+ lctl lmet lalt           @acm           @mac rmet cmp  rctl
+ )
+#+end_src  
+** Cambio de capas
+- Cuatro estilos:
+  + Toggle: la capa está activada mientras se mantiene presionada una tecla (hold)
+  + One shot: Se presiona una tecla sin mantener (tap) que cambia la capa, el siguiente botón que se presione está en la nueva capa, tras soltar ese botón se regresa a la capa anterior
+  + Temporal: cambia la capa durante un periodo de tiempo dado
+  + Switch: cambia la capa base por otra
+
+#+begin_src emacs-lisp :session *elisp* :results output :exports both :tangle /tmp/test.sh
+  (defalias ket (layer-toggle capa))
+  (defalias ken (layer-next next-layer))
+  (defalias ked (layer-delay 500 delayed-layer))
+  (defalias kes (layer-switch switch-layer))
+#+end_src
+    
+* Botones modificadores
+- Para expresar botones que son combinaciones con los modificadores ctrl, alt, meta (super) y shift,  
+- Se puede usar (around modificador tecla)
+- También se pueden usar botones especiales C-, A-, M-, S-
+   (modificadores izquierda), RC-, RA-, RM-, RS- (modificadores derecha)
+
+#+begin_src emacs-lisp :session *elisp* :results output :exports both :tangle /tmp/test.sh
+  (defalias cz (around lctl z))
+  ;; otra forma
+  (defalias cz C-z)
+  ;; control alt suprimir
+  (defalias cas (around lctl (around lalt KeyDelete)))
+  ;; otra forma
+  (defalias cas C-A-KeyDelete)
+#+end_src
+
+* Macros
+- Sirven para expresar una secuencia de botones como si fueran un solo bóton
+- Es válido hacer referencia a otro alias (usando @)
+- Hay varios estilos y variantes, revisar documentación
+#+begin_src emacs-lisp :session *elisp* :results output :exports both :tangle /tmp/test.sh
+  (defalias hi (tap-macro h o l a))
+  ;; llaves que abren y cierran
+  (defalias lla (tap-macro (around ralt ') (around ralt KeyBackslash) lft))
+  ;; llaves al estilo C
+  (defalias ll2 (tap-macro @lla ret ret KeyUp KeyTab)) 
+#+end_src    
+* Botones tap-hold
+- Permiten que una tecla pueda actuar como dos botones diferentes dependiendo de si solo se presiona y suelta (tap) o se mantiene presionado (hold)
+- Kmonad propone diferentes variantes, revisar la documentación
+- =tap-hold-next-release= es posiblemente la versión más cómoda
+
+#+begin_src emacs-lisp :session *elisp* :results output :exports both :tangle /tmp/test.sh
+  ;; enter con tap, cambiar de capa con hold
+  ;; si pasa más de un segundo en hold, no hacer nada
+  (defalias mac (tap-hold-next-release 1000 ret (layer-toggle macro)))
+
+  ;; vocal normal con tap, vacal con acento con hold
+  ;; después de 200 milisegundos poner vocal con acento
+  (defalias voc (tap-hold 200 a (tap-macro-release ' a)))
+#+end_src  
+  
+* Botones multi-tap
+- Permiten que una misma tecla produzca diferentes botones de acuerdo al número de veces que se presionó en un periodo de tiempo establecido
+- No se puede combinar directamente con multi-tap
+
+#+begin_src emacs-lisp :session *elisp* :results output :exports both :tangle /tmp/test.sh
+  (defalias
+  mt  (multi-tap 300 a 300 b 300 c 300 d e))
+#+end_src  
+
+* Around next
+- Permite que la siguiente vez que se presione un botón se haga en un contexto especial, por ejemplo en otra capa (al estilo one-shot) o con un modificador activado
+- Permite combinaciones más avanzadas, por ejemplo para lograr combinar un tap-hold con un multi-tap
+
+#+begin_src emacs-lisp :session *elisp* :results output :exports both :tangle /tmp/test.sh
+  ;; la siguiente vez que se presione una tecla será como si se estuviera manteniendo shift
+  (defalias ns  (around-next sft))
+
+  ;; un tap es backspace, dos taps C-z, hold cambiar capa
+  (defalias cz2 (tap-hold-next-release
+       1000
+       (around-next-timeout
+	100
+	(layer-toggle acentos) ;; en la capa acentos la tecla es C-z
+	backspace) ;; si pasan 100 milisegundos y no se presiona nada
+       (layer-toggle macros2)))
+#+end_src  
+  
+* Botones Command
+- Para que un botón ejecute un comando arbitrario del sistema o scripts propios
+- CUIDADO puede haber implicaciones de seguridad, nunca ejecutar ciegamente la configuración de alguien más
+
+#+begin_src bash :session *elisp* :results output :exports both :tangle /tmp/test.sh
+  ;; click izquierdo del ratón usando comando xdotool
+  (defalias mou (cmd-button "xdotool click 1"))
+#+end_src  
+
+* Otras configuraciones
+** Evitar usar root o sudo
+#+begin_src emacs-lisp :session *elisp* :results output :exports both :tangle /tmp/test.sh
+  sudo groupadd uinput
+  sudo usermod -a -G uinput tuUsuario
+  echo 'KERNEL=="uinput", MODE="0660", GROUP="uinput", OPTIONS+="static_node=uinput"' | sudo tee /etc/udev/rules.d/90-uinput.rules
+  reboot # necesario
+#+end_src
+
+** Autocargar configuración al conectar teclado
+- Se puede lograr mediante udev rules
+- Primero obtener información del dispositivo para ver información de identificación
+  #+begin_src bash :session *bash* :results output :exports both :tangle /tmp/test.sh
+    udevadm  info -a -n /dev/input/by-id/dispositivo
+  #+end_src
+- Crear regla, tener cuidado que el comando a ejecutar se ejecute en
+  un proceso a parte, sino udev lo mata después de un tiempo
+- Para lo anterior se puede usar el servicio =at=, el cual hay que
+  instalar y habilitar
+
+#+begin_src bash :session *bash* :results output :exports both :tangle /tmp/test.sh
+  echo 'SUBSYSTEM=="usb", ATTRS{idVendor}=="miID", ATTRS{idProduct}=="miID", ACTION=="add", RUN+="echo /ruta/kmonad /ruta/miConf.kbd | at now"' | sudo tee /etc/udev/rules.d/90-miTeclado.rules
+#+end_src  
+  
